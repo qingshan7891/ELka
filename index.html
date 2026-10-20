@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>卡密验证 · 折线北极星链</title>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+
+    body {
+        height: 100vh;
+        overflow: hidden;
+        background: #050508;
+        color: #e6e6e6;
+        touch-action: none;
+    }
+
+    #trail-container{
+        position:fixed;
+        inset:0;
+        pointer-events:none;
+        z-index:100;
+    }
+    .trail{
+        position:absolute;
+        width:6px;
+        height:6px;
+        background:#a8c8ff;
+        border-radius:50%;
+        transform:translate(-50%,-50%);
+        box-shadow:0 0 8px #a8c8ff;
+        will-change: transform, opacity;
+    }
+
+    .page1 {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        transition: opacity 0.6s ease, transform 0.6s ease;
+        backdrop-filter: blur(2px);
+    }
+
+    .page1.hidden {
+        opacity: 0;
+        transform: scale(0.92);
+        pointer-events: none;
+    }
+
+    .box {
+        background: rgba(20, 22, 30, 0.85);
+        padding: 32px 28px;
+        border-radius: 16px;
+        border: 1px solid #2a2f40;
+        width: 380px;
+        max-width: 92vw;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.03);
+    }
+
+    .box h3 {
+        text-align: center;
+        margin-bottom: 18px;
+        font-weight: 500;
+        letter-spacing: 2px;
+        color: #cfd6e6;
+        font-size: 1.25rem;
+    }
+
+    .input-wrap{
+        position:relative;
+        margin-bottom: 12px;
+    }
+    input {
+        width: 100%;
+        padding: 14px 44px 14px 16px;
+        background: #11141c;
+        border: 1px solid #3a4055;
+        color: #fff;
+        border-radius: 8px;
+        outline: none;
+        font-size: 15px;
+        letter-spacing: 0.5px;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    input:focus {
+        border-color: #6d7b9d;
+        box-shadow: 0 0 0 3px rgba(109, 123, 157, 0.2);
+    }
+    .eye-btn{
+        position:absolute;
+        right:14px;
+        top:50%;
+        transform:translateY(-50%);
+        color:#b0b8cc;
+        cursor:pointer;
+        user-select:none;
+        font-size: 1.2rem;
+        transition: color 0.2s;
+    }
+    .eye-btn:hover{
+        color: #fff;
+    }
+
+    .btn-row{
+        display:flex;
+        gap:10px;
+        margin-top:14px;
+    }
+    button {
+        flex:1;
+        padding: 13px 10px;
+        background: linear-gradient(135deg, #222940, #2b3552);
+        color: #d8e0f0;
+        border: 1px solid #333a52;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        letter-spacing: 1.5px;
+        font-weight: 500;
+        transition: transform 0.15s ease, background 0.25s ease, box-shadow 0.25s;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    #copyKeyBtn{
+        background: linear-gradient(135deg, #253850, #2f4b70);
+        border-color: #3f5a80;
+    }
+
+    button:hover {
+        background: linear-gradient(135deg, #2b3552, #36426b);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 14px rgba(0,0,0,0.3);
+    }
+    button:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    #msg {
+        margin-top: 16px;
+        text-align: center;
+        font-size: 13px;
+        min-height: 22px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        word-break: break-all;
+        font-weight: 500;
+    }
+    #msg.success{
+        color:#88d8b0;
+    }
+    #msg.error{
+        color:#ff6b6b;
+    }
+    #msg.info{
+        color:#a8c8ff;
+    }
+
+    #msg.show {
+        opacity: 1;
+    }
+
+    .page2 {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(ellipse at center, #071020 0%, #020409 70%);
+        opacity: 0;
+        transition: opacity 1.2s ease;
+        z-index: 5;
+        overflow: hidden;
+        pointer-events: none;
+    }
+
+    .page2.show {
+        opacity: 1;
+    }
+
+    #starfield {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    .star {
+        position: absolute;
+        background: #fff;
+        border-radius: 50%;
+        opacity: 0.3;
+        animation: starFade 4s ease-in-out infinite;
+        will-change: opacity;
+    }
+
+    @keyframes starFade {
+        0%, 100% { opacity: 0.15; }
+        50% { opacity: 0.65; }
+    }
+
+    .winding-chain{
+        position:absolute;
+        width:320px;
+        height:220px;
+        animation: wanderPath 22s ease-in-out infinite;
+        will-change: top, left, transform;
+        opacity: 0.8;
+    }
+    .path-line{
+        stroke: rgba(180,210,255,0.45);
+        stroke-width:1.2;
+        fill:none;
+        filter:blur(0.6px);
+    }
+    .chain-star {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background: #ffffff;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        box-shadow:
+            0 0 8px #fff,
+            0 0 20px #cde0ff,
+            0 0 45px #7aa8ff;
+        animation:
+            starPulse 3s ease-in-out infinite,
+            chainStarTwinkle 2.2s ease-in-out infinite;
+        will-change: transform, opacity;
+    }
+
+    @keyframes starPulse {
+        0%, 100% { transform: translate(-50%, -50%) scale(1); }
+        50% { transform: translate(-50%, -50%) scale(1.25); }
+    }
+
+    @keyframes chainStarTwinkle {
+        0%, 100% { opacity: 0.85; }
+        50% { opacity: 1; }
+    }
+
+    @keyframes wanderPath {
+        0%{ top:20%; left:15%; transform:rotate(-6deg); }
+        25%{ top:35%; left:70%; transform:rotate(8deg); }
+        50%{ top:70%; left:60%; transform:rotate(-3deg); }
+        75%{ top:55%; left:10%; transform:rotate(5deg); }
+        100%{ top:20%; left:15%; transform:rotate(-6deg); }
+    }
+
+    .text {
+        position: absolute;
+        top: 68%;
+        left: 50%;
+        transform: translate(-50%, 20px);
+        color: #d6e4f7;
+        font-size: 18px;
+        letter-spacing: 8px;
+        opacity: 0;
+        text-shadow: 0 0 12px rgba(170, 200, 255, 0.6);
+        animation: textIn 1.4s ease-out 2s forwards;
+        z-index: 2;
+        white-space: nowrap;
+        font-weight: 300;
+    }
+
+    @keyframes textIn {
+        to {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+    }
+
+    @media (max-width: 480px) {
+        .box { padding: 24px 18px; width: 340px; }
+        .text { font-size: 15px; letter-spacing: 5px; }
+    }
+
+    .page2 * {
+        pointer-events: none;
+    }
+
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-6px); }
+        75% { transform: translateX(6px); }
+    }
+</style>
+</head>
+
+<body>
+<div id="trail-container"></div>
+
+    <div class="page1" id="page1">
+        <div class="box">
+            <h3>卡密验证</h3>
+            <div class="input-wrap">
+                <input type="password" id="keyInput" placeholder="请输入卡密" autocomplete="off" spellcheck="false" />
+                <span class="eye-btn" id="eye" role="button" aria-label="切换密码可见性">👁</span>
+            </div>
+
+            <div class="btn-row">
+                <button onclick="checkKey()" id="verifyBtn">验 证</button>
+                <button id="copyKeyBtn">提取卡密</button>
+            </div>
+            <p id="msg"></p>
+        </div>
+    </div>
+
+    <div class="page2" id="page2">
+        <div id="starfield"></div>
+
+        <div class="winding-chain">
+            <svg width="320" height="220">
+                <polyline class="path-line" points="20,110 80,40 140,180 200,90 260,20 310,100"/>
+            </svg>
+            <div class="chain-star" style="left:20px;top:110px"></div>
+            <div class="chain-star" style="left:80px;top:40px;animation-delay:0.2s"></div>
+            <div class="chain-star" style="left:140px;top:180px;animation-delay:0.4s"></div>
+            <div class="chain-star" style="left:200px;top:90px;animation-delay:0.6s"></div>
+            <div class="chain-star" style="left:260px;top:20px;animation-delay:0.8s"></div>
+            <div class="chain-star" style="left:310px;top:100px;animation-delay:1.2s"></div>
+        </div>
+        <div class="winding-chain" style="animation-delay:-5s;animation-duration:24s;">
+            <svg width="320" height="220">
+                <polyline class="path-line" points="10,80 90,160 150,30 220,120 315,130"/>
+            </svg>
+            <div class="chain-star" style="left:10px;top:80px"></div>
+            <div class="chain-star" style="left:90px;top:160px;animation-delay:0.3s"></div>
+            <div class="chain-star" style="left:150px;top:30px;animation-delay:0.6s"></div>
+            <div class="chain-star" style="left:220px;top:120px;animation-delay:0.9s"></div>
+            <div class="chain-star" style="left:315px;top:130px;animation-delay:1.8s"></div>
+        </div>
+        <div class="winding-chain" style="animation-delay:-9s;animation-duration:27s;">
+            <svg width="320" height="220">
+                <polyline class="path-line" points="30,160 70,60 160,140 210,50 305,120"/>
+            </svg>
+            <div class="chain-star" style="left:30px;top:160px"></div>
+            <div class="chain-star" style="left:70px;top:60px;animation-delay:0.25s"></div>
+            <div class="chain-star" style="left:160px;top:140px;animation-delay:0.5s"></div>
+            <div class="chain-star" style="left:210px;top:50px;animation-delay:0.75s"></div>
+            <div class="chain-star" style="left:305px;top:120px;animation-delay:1.5s"></div>
+        </div>
+        <div class="winding-chain" style="animation-delay:-12s;animation-duration:31s;">
+            <svg width="320" height="220">
+                <polyline class="path-line" points="40,40 100,190 180,70 250,170 300,50"/>
+            </svg>
+            <div class="chain-star" style="left:40px;top:40px"></div>
+            <div class="chain-star" style="left:100px;top:190px;animation-delay:0.2s"></div>
+            <div class="chain-star" style="left:180px;top:70px;animation-delay:0.5s"></div>
+            <div class="chain-star" style="left:250px;top:170px;animation-delay:0.8s"></div>
+            <div class="chain-star" style="left:300px;top:50px;animation-delay:1.1s"></div>
+        </div>
+        <div class="winding-chain" style="animation-delay:-16s;animation-duration:29s;">
+            <svg width="320" height="220">
+                <polyline class="path-line" points="25,90 95,25 170,160 240,80 310,155"/>
+            </svg>
+            <div class="chain-star" style="left:25px;top:90px"></div>
+            <div class="chain-star" style="left:95px;top:25px;animation-delay:0.3s"></div>
+            <div class="chain-star" style="left:170px;top:160px;animation-delay:0.6s"></div>
+            <div class="chain-star" style="left:240px;top:80px;animation-delay:0.9s"></div>
+            <div class="chain-star" style="left:310px;top:155px;animation-delay:1.3s"></div>
+        </div>
+
+        <div class="text">验 证 成 功</div>
+    </div>
+
+<script>
+    (function(){
+        const page1 = document.getElementById("page1");
+        const page2 = document.getElementById("page2");
+        const msg = document.getElementById("msg");
+        const starfield = document.getElementById("starfield");
+        const keyInput = document.getElementById("keyInput");
+        const eyeBtn = document.getElementById("eye");
+        const copyBtn = document.getElementById("copyKeyBtn");
+        const trailContainer = document.getElementById("trail-container");
+        const verifyBtn = document.getElementById("verifyBtn");
+
+        // ============================================================
+        // 【自动随机生成卡密】
+        // 每次打开页面都会重新生成一批随机后缀的卡密
+        // 如需固定卡密，把 AUTO_RANDOM_KEYS 改为 false，并在 FIXED_KEYS 中手写
+        // ============================================================
+        const AUTO_RANDOM_KEYS = true;   // true = 每次打开自动随机生成；false = 使用下方手写列表
+
+        // 每个前缀生成多少个卡密
+        const KEYS_PER_PREFIX = 3;
+
+        // 前缀 → 时长映射（同时决定了随机卡密的前缀和有效期）
+        const PREFIX_DURATIONS = {
+            'EL-001': 10 * 1000,                    // 10秒
+            'EL-123': 1 * 24 * 60 * 60 * 1000,      // 1天
+            'EL-124': 7 * 24 * 60 * 60 * 1000,      // 1周
+            'EL-125': 30 * 24 * 60 * 60 * 1000,     // 1月
+            'EL-126': 90 * 24 * 60 * 60 * 1000,     // 1季
+            'EL-888': 365 * 24 * 60 * 60 * 1000,    // 1年
+            'EL-789': Infinity                       // 永久
+        };
+
+        // 随机后缀字符集（去掉易混淆字符 0/O/1/l/I）
+        const SUFFIX_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+
+        function randomSuffix(len = 8) {
+            let s = '';
+            for (let i = 0; i < len; i++) {
+                s += SUFFIX_CHARS[Math.floor(Math.random() * SUFFIX_CHARS.length)];
+            }
+            return s;
+        }
+
+        // 自动生成卡密数据库
+        function generateRandomKeys() {
+            const db = {};
+            for (const [prefix, ms] of Object.entries(PREFIX_DURATIONS)) {
+                for (let i = 0; i < KEYS_PER_PREFIX; i++) {
+                    let key;
+                    // 避免极端情况下碰撞
+                    do {
+                        key = `${prefix}-${randomSuffix()}`;
+                    } while (db[key] !== undefined);
+                    db[key] = ms;
+                }
+            }
+            return db;
+        }
+
+        // 手写固定卡密（当 AUTO_RANDOM_KEYS = false 时使用）
+        const MANUAL_KEYS = {
+            'EL-001-7xKq9mZw': 10 * 1000,
+            'EL-123-Hc8fJ2Ld': 1 * 24 * 60 * 60 * 1000,
+            'EL-124-Tg9wXp1N': 7 * 24 * 60 * 60 * 1000,
+            'EL-125-Mf3jYu7b': 30 * 24 * 60 * 60 * 1000,
+            'EL-126-Vb4kCt9r': 90 * 24 * 60 * 60 * 1000,
+            'EL-888-Zp7gNw3x': 365 * 24 * 60 * 60 * 1000,
+            'EL-789-Qc8tHy6v': Infinity
+        };
+
+        // 最终使用的卡密表
+        const FIXED_KEYS = AUTO_RANDOM_KEYS ? generateRandomKeys() : MANUAL_KEYS;
+
+        // 把本次生成的卡密持久化到 localStorage，这样刷新页面后同一批卡密还能验证
+        // （如果不想持久化，把 SAVE_GENERATED_KEYS 改为 false）
+        const SAVE_GENERATED_KEYS = true;
+        const GENERATED_KEYS_STORAGE = 'AY520_GENERATED_KEYS';
+
+        let effectiveKeys = {};
+
+        function loadEffectiveKeys() {
+            if (AUTO_RANDOM_KEYS && SAVE_GENERATED_KEYS) {
+                try {
+                    const stored = localStorage.getItem(GENERATED_KEYS_STORAGE);
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+                            // Infinity 在 JSON 里变成 null，需要还原
+                            for (const k in parsed) {
+                                effectiveKeys[k] = parsed[k] === null ? Infinity : parsed[k];
+                            }
+                            return;
+                        }
+                    }
+                } catch (e) {}
+                // 没有已保存的，使用本次新生成的并保存
+                effectiveKeys = FIXED_KEYS;
+                saveEffectiveKeys();
+            } else {
+                effectiveKeys = FIXED_KEYS;
+            }
+        }
+
+        function saveEffectiveKeys() {
+            if (!(AUTO_RANDOM_KEYS && SAVE_GENERATED_KEYS)) return;
+            try {
+                const serializable = {};
+                for (const k in effectiveKeys) {
+                    serializable[k] = effectiveKeys[k] === Infinity ? null : effectiveKeys[k];
+                }
+                localStorage.setItem(GENERATED_KEYS_STORAGE, JSON.stringify(serializable));
+            } catch (e) {}
+        }
+
+        // ---------- 已使用记录 / 首次使用记录 ----------
+        const USAGE_STORAGE_KEY = 'AY520_KEY_FIRST_USE';
+        const USED_STORAGE_KEY = 'AY520_KEY_USED_LIST';
+        let firstUseMap = {};
+        let usedKeys = {};
+
+        function loadStorage() {
+            try {
+                const stored = localStorage.getItem(USAGE_STORAGE_KEY);
+                if (stored) firstUseMap = JSON.parse(stored) || {};
+            } catch (e) { firstUseMap = {}; }
+
+            try {
+                const used = localStorage.getItem(USED_STORAGE_KEY);
+                if (used) usedKeys = JSON.parse(used) || {};
+            } catch (e) { usedKeys = {}; }
+        }
+
+        function saveFirstUseMap() {
+            try {
+                localStorage.setItem(USAGE_STORAGE_KEY, JSON.stringify(firstUseMap));
+            } catch (e) {}
+        }
+
+        function saveUsedKeys() {
+            try {
+                localStorage.setItem(USED_STORAGE_KEY, JSON.stringify(usedKeys));
+            } catch (e) {}
+        }
+
+        function getExpiresAt(key) {
+            const duration = effectiveKeys[key];
+            if (duration === undefined) return null;
+            if (duration === Infinity) return Infinity;
+
+            if (!firstUseMap[key]) {
+                firstUseMap[key] = Date.now();
+                saveFirstUseMap();
+            }
+            return firstUseMap[key] + duration;
+        }
+
+        // ---------- 前缀标签 ----------
+        const PREFIX_LABEL = {
+            'EL-001': '10秒',
+            'EL-123': '1天',
+            'EL-124': '1周',
+            'EL-125': '1月',
+            'EL-126': '1季',
+            'EL-888': '1年',
+            'EL-789': '永久'
+        };
+
+        function getKeyLabel(key) {
+            for (const prefix of Object.keys(PREFIX_LABEL)) {
+                if (key.startsWith(prefix + '-')) return PREFIX_LABEL[prefix];
+            }
+            return '未知';
+        }
+
+        // ---------- 音频 ----------
+        let audioCtx = null;
+        function getAudioContext() {
+            if (!audioCtx) {
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {}
+            }
+            return audioCtx;
+        }
+
+        function playClickSound() {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = "sine";
+            osc.frequency.value = 1200;
+            gain.gain.setValueAtTime(0.18, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.07);
+        }
+
+        function playErrorSound() {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(320, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.18);
+            gain.gain.setValueAtTime(0.22, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.18);
+        }
+
+        function playSuccessSound() {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.frequency.setValueAtTime(1320, ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.25);
+        }
+
+        // ---------- 格式化 ----------
+        function formatRemain(expiresAt) {
+            const now = Date.now();
+            const diff = expiresAt - now;
+            if (diff <= 0) return { text: '已过期', expired: true };
+            const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+            const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+            const minutes = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
+            const seconds = Math.floor((diff % (60 * 1000)) / 1000);
+            let text = '';
+            if (days > 0) text += `${days}天`;
+            if (hours > 0) text += `${hours}小时`;
+            if (days === 0 && minutes > 0) text += `${minutes}分钟`;
+            if (days === 0 && hours === 0 && minutes === 0 && seconds > 0) text += `${seconds}秒`;
+            if (!text) text = '不到1秒';
+            return { text: `剩余${text}`, expired: false };
+        }
+
+        function formatExpireDate(expiresAt) {
+            if (expiresAt === Infinity) return '永久有效';
+            const d = new Date(expiresAt);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const h = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            const s = String(d.getSeconds()).padStart(2, '0');
+            return `${y}-${m}-${day} ${h}:${min}:${s}`;
+        }
+
+        function showMessage(text, type = 'info', duration = 2500) {
+            msg.textContent = text;
+            msg.className = `show ${type}`;
+            clearTimeout(msg._timer);
+            msg._timer = setTimeout(() => {
+                msg.className = '';
+            }, duration);
+        }
+
+        // ---------- 眼睛按钮 ----------
+        let showPwd = false;
+        eyeBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            playClickSound();
+            showPwd = !showPwd;
+            keyInput.type = showPwd ? "text" : "password";
+            eyeBtn.textContent = showPwd ? "🙈" : "👁";
+        });
+
+        // ---------- 提取卡密 ----------
+        copyBtn.addEventListener("click", async () => {
+            playClickSound();
+            const allKeys = Object.keys(effectiveKeys);
+            if (allKeys.length === 0) {
+                showMessage("暂无可用卡密", 'error', 2000);
+                return;
+            }
+            const chosen = allKeys[Math.floor(Math.random() * allKeys.length)];
+            const label = getKeyLabel(chosen);
+            const usedMark = usedKeys[chosen] ? '（已使用）' : '';
+            try {
+                await navigator.clipboard.writeText(chosen);
+                showMessage(`✅ 已复制（${label}${usedMark}）：${chosen}`, 'success', 5000);
+            } catch (err) {
+                showMessage(`卡密（${label}${usedMark}）：${chosen}`, 'info', 6000);
+            }
+        });
+
+        // ---------- 拖尾粒子 ----------
+        let lastTrailTime = 0;
+        const TRAIL_INTERVAL = 30;
+        function createTrailParticle(x, y) {
+            const now = Date.now();
+            if (now - lastTrailTime < TRAIL_INTERVAL) return;
+            lastTrailTime = now;
+            const p = document.createElement("div");
+            p.className = "trail";
+            p.style.left = x + "px";
+            p.style.top = y + "px";
+            p.style.opacity = '0.8';
+            p.style.transform = 'translate(-50%,-50%) scale(1)';
+            trailContainer.appendChild(p);
+            requestAnimationFrame(() => {
+                p.style.transition = "all 0.6s ease-out";
+                p.style.opacity = 0;
+                p.style.transform = "translate(-50%,-50%) scale(0.2)";
+            });
+            setTimeout(() => p.remove(), 700);
+        }
+
+        document.addEventListener("mousemove", (e) => createTrailParticle(e.clientX, e.clientY));
+        document.addEventListener("touchmove", (e) => {
+            if (e.touches.length) createTrailParticle(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: true });
+
+        // ---------- 星星 ----------
+        function createStars() {
+            starfield.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+            const starCount = window.innerWidth < 600 ? 200 : 380;
+            for (let i = 0; i < starCount; i++) {
+                const star = document.createElement("div");
+                star.className = "star";
+                const size = Math.random() * 2 + 0.4;
+                star.style.width = size + "px";
+                star.style.height = size + "px";
+                star.style.left = Math.random() * 100 + "%";
+                star.style.top = Math.random() * 100 + "%";
+                star.style.opacity = Math.random() * 0.4 + 0.1;
+                star.style.animationDelay = Math.random() * 4 + "s";
+                star.style.animationDuration = (Math.random() * 3 + 3) + "s";
+                fragment.appendChild(star);
+            }
+            starfield.appendChild(fragment);
+        }
+
+        // ---------- 验证 ----------
+        window.checkKey = function() {
+            const input = keyInput.value.trim();
+            if (!input) {
+                showMessage("请输入卡密", "error", 2000);
+                playErrorSound();
+                shakeInput();
+                return;
+            }
+
+            // 检查是否在有效卡密表中
+            if (!(input in effectiveKeys)) {
+                showMessage("卡密无效，请重新输入", "error", 2500);
+                playErrorSound();
+                shakeInput();
+                return;
+            }
+
+            // 检查是否已被使用（本浏览器内）
+            if (usedKeys[input]) {
+                const usedTime = new Date(usedKeys[input]).toLocaleString('zh-CN');
+                showMessage(`❌ 此卡密已被使用（${usedTime}）`, "error", 3500);
+                playErrorSound();
+                shakeInput();
+                return;
+            }
+
+            const expiresAt = getExpiresAt(input);
+            const label = getKeyLabel(input);
+
+            // 检查过期
+            if (expiresAt !== Infinity && Date.now() > expiresAt) {
+                const expireStr = formatExpireDate(expiresAt);
+                showMessage(`❌ 卡密已于 ${expireStr} 过期`, "error", 3500);
+                playErrorSound();
+                shakeInput();
+                return;
+            }
+
+            // 标记为已使用
+            usedKeys[input] = Date.now();
+            saveUsedKeys();
+
+            // 验证成功
+            playSuccessSound();
+            page1.classList.add("hidden");
+            setTimeout(() => page2.classList.add("show"), 300);
+            showMessage("", "info", 0);
+
+            const remain = expiresAt === Infinity ? { text: '永久有效' } : formatRemain(expiresAt);
+            console.log(`✅ 验证成功 | 类型: ${label} | ${expiresAt === Infinity ? '永久' : '到期: ' + formatExpireDate(expiresAt) + ' | ' + remain.text}`);
+        };
+
+        function shakeInput() {
+            keyInput.style.animation = "none";
+            void keyInput.offsetHeight;
+            keyInput.style.animation = "shake 0.4s ease";
+            setTimeout(() => keyInput.style.animation = "", 400);
+        }
+
+        keyInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                playClickSound();
+                checkKey();
+            }
+        });
+
+        verifyBtn.addEventListener("click", () => playClickSound());
+
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(createStars, 300);
+        });
+
+        // ---------- 初始化 ----------
+        loadEffectiveKeys();
+        loadStorage();
+        createStars();
+        page2.classList.remove('show');
+        page1.classList.remove('hidden');
+
+        console.log('%c卡密系统已就绪（自动随机生成）', 'color:#88d8b0;font-size:14px;font-weight:bold');
+        console.log(`当前共 ${Object.keys(effectiveKeys).length} 个卡密`);
+        console.log('当前卡密列表：');
+        for (const [k, v] of Object.entries(effectiveKeys)) {
+            console.log(`  ${k}  →  ${getKeyLabel(k)}${v === Infinity ? '（永久）' : ''}`);
+        }
+        console.log('\n提示：在控制台执行 resetKeys() 可清空并重新生成一批新卡密');
+        console.log('提示：在控制台执行 showKeys() 可随时查看当前所有卡密');
+
+        // 暴露到全局方便调试
+        window.showKeys = function() {
+            console.log('当前卡密列表：');
+            for (const [k, v] of Object.entries(effectiveKeys)) {
+                const used = usedKeys[k] ? ' [已使用]' : '';
+                console.log(`  ${k}  →  ${getKeyLabel(k)}${v === Infinity ? '（永久）' : ''}${used}`);
+            }
+        };
+
+        window.resetKeys = function() {
+            try {
+                localStorage.removeItem(GENERATED_KEYS_STORAGE);
+            } catch (e) {}
+            effectiveKeys = generateRandomKeys();
+            saveEffectiveKeys();
+            console.log('已重新生成一批新卡密：');
+            window.showKeys();
+        };
+    })();
+</script>
+</body>
+</html>
